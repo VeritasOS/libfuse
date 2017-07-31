@@ -77,6 +77,7 @@ struct fuse_config {
 	int intr_signal;
 	int help;
 	char *modules;
+	int max_idle_threads;
 };
 
 struct fuse_fs {
@@ -4322,6 +4323,20 @@ int fuse_loop(struct fuse *f)
 	return fuse_session_loop(f->se);
 }
 
+int fuse_loop_mt(struct fuse *f)
+{
+	if (f == NULL)
+		return -1;
+
+	int res = fuse_start_cleanup_thread(f);
+	if (res)
+		return -1;
+
+	res = fuse_session_loop_mt(fuse_get_session(f), f->conf.max_idle_threads);
+	fuse_stop_cleanup_thread(f);
+	return res;
+}
+
 int fuse_invalidate(struct fuse *f, const char *path)
 {
 	(void) f;
@@ -4405,6 +4420,7 @@ static const struct fuse_opt fuse_lib_opts[] = {
 	FUSE_LIB_OPT("intr",		      intr, 1),
 	FUSE_LIB_OPT("intr_signal=%d",	      intr_signal, 0),
 	FUSE_LIB_OPT("modules=%s",	      modules, 0),
+	FUSE_LIB_OPT("idle_threads=%u",   max_idle_threads, 0),
 	FUSE_OPT_END
 };
 
@@ -4430,6 +4446,7 @@ static void fuse_lib_help(void)
 "    -o intr                allow requests to be interrupted\n"
 "    -o intr_signal=NUM     signal to send on interrupt (%i)\n"
 "    -o modules=M1[:M2...]  names of modules to push onto filesystem stack\n"
+"    -o idle_threads=N      maximum number of idle threads allowed\n"
 "\n", FUSE_DEFAULT_INTR_SIGNAL);
 }
 
@@ -4658,6 +4675,10 @@ struct fuse *fuse_new_common(struct fuse_chan *ch, struct fuse_args *args,
 			    fuse_push_module(f, module, args) == -1)
 				goto out_free_fs;
 		}
+	}
+
+	if (f->conf.max_idle_threads == 0) {
+		f->conf.max_idle_threads = 10;
 	}
 
 	if (!f->conf.ac_attr_timeout_set)
