@@ -77,7 +77,7 @@ struct fuse_config {
 	int intr_signal;
 	int help;
 	char *modules;
-	int max_idle_threads;
+	unsigned int max_idle_threads;
 };
 
 struct fuse_fs {
@@ -4652,6 +4652,7 @@ struct fuse *fuse_new_common(struct fuse_chan *ch, struct fuse_args *args,
 	f->conf.attr_timeout = 1.0;
 	f->conf.negative_timeout = 0.0;
 	f->conf.intr_signal = FUSE_DEFAULT_INTR_SIGNAL;
+	f->conf.max_idle_threads = 10;
 
 	f->pagesize = getpagesize();
 	init_list_head(&f->partial_slabs);
@@ -4675,10 +4676,6 @@ struct fuse *fuse_new_common(struct fuse_chan *ch, struct fuse_args *args,
 			    fuse_push_module(f, module, args) == -1)
 				goto out_free_fs;
 		}
-	}
-
-	if (f->conf.max_idle_threads == 0) {
-		f->conf.max_idle_threads = 10;
 	}
 
 	if (!f->conf.ac_attr_timeout_set)
